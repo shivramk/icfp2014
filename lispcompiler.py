@@ -4,13 +4,17 @@ import sys
 
 Symbol = namedtuple('Symbol', ['token', 'line', 'column'])
 
-class SyntaxError(Exception):
-    def __init__(self, message, line=None, column=None):
-        if line is None:
-            message = "Error: %s" % (message)
-        else:
-            message = "Error: Line %d, column %d: %s" % (line, column, message)
-        Exception.__init__(self, message)
+class CompileError(Exception): pass
+
+def sym_error_lc(message, line, column):
+    return CompileError("Error: Line %d, column %d: %s" % (line,
+        column, message))
+
+def sym_error(message, symbol):
+    return sym_error_lc(message, symbol.line, symbol.column)
+
+def semantic_error(message):
+    return CompileError("Error: %s" % message)
 
 def tokenize(s):
     line, column = 1, 1
@@ -42,7 +46,7 @@ def read_expr(tokens):
         tokens.pop(0) # pop off ')'
         return L
     elif ')' == token:
-        raise SyntaxError('unexpected )', line, column)
+        sym_error_lc('unexpected )', line, column)
     else:
         return Symbol(atom(token), line, column)
 
@@ -62,19 +66,15 @@ def atom(token):
         except ValueError:
             return token
 
-def compile_add(self, args, stream):
-    for expr in args:
-        compile_expr(expr, stream)
-    stream.write('ADD\n')
-
-def compile_sub(self, args, stream):
-    for expr in args:
-        compile_expr(expr, stream)
-    stream.write('SUB\n')
+def compile_binop(op):
+    def compile_op(self, args, stream):
+        if len(args) != 2:
+            raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+    return compile_op
 
 builtins = {
-    '+': compile_add,
-    '-': compile_sub
+    '+': compile_binop('ADD'),
+    '-': compile_binop('SUB')
 }
 
 symtable = {}
@@ -85,11 +85,10 @@ def compile_atom(expr, stream):
 def compile_lisp(exprlist):
     for idx, expr in enumerate(exprlist):
         if expr[0].token != 'define':
-            raise SyntaxError("Expected 'define' at top level", expr[0].line,
-                    expr[0].column)
+            raise sym_error("Expected 'define' at top level", expr[0])
         symtable[expr[1][0].token] = idx
     if 'main' not in symtable:
-        raise SyntaxError("main function missing")
+        raise semantic_error("main function missing")
 
     # Move main to the top
     mainidx = symtable['main']
@@ -109,8 +108,7 @@ def compile_apply(self, args, stream):
     elif isinstance(self.token, int):
         compile_atom(self, stream)
     else:
-        raise SyntaxError("Undefined reference to '%s'" % self.token,
-                self.line, self.column)
+        raise sym_error("Undefined reference to '%s'" % self.token, self)
 
 def compile_expr(expr, stream):
     if isinstance(expr, list):
@@ -118,8 +116,7 @@ def compile_expr(expr, stream):
     elif isinstance(expr.token, int):
         compile_atom(expr, stream)
     else:
-        raise SyntaxError("Unknown type: %s" % str(type(expr)), 
-                expr.line, expr.column)
+        raise sym_error("Unknown type: %s" % str(type(expr)), expr)
 
 def compile_function(definition, body, stream):
     name = definition[0].token
@@ -137,8 +134,8 @@ def main():
     with open(sys.argv[1]) as f:
         try:
             compile_lisp(parse(f.read().strip()))
-        except SyntaxError, e:
-            print e
+        except CompileError, e:
+            sys.stderr.write(str(e) + '\n')
 
 if __name__ == "__main__":
     main()
