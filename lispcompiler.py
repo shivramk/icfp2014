@@ -41,12 +41,16 @@ def read_expr(tokens):
     token, line, column = tokens.pop(0)
     if '(' == token:
         L = []
-        while tokens[0][0] != ')':
+        while True:
+            if len(tokens) == 0:
+                raise sym_error_lc('mismatched (', line, column)
+            elif tokens[0][0] == ')':
+                break
             L.append(read_expr(tokens))
         tokens.pop(0) # pop off ')'
         return L
     elif ')' == token:
-        sym_error_lc('unexpected )', line, column)
+        raise sym_error_lc('unexpected )', line, column)
     else:
         return Symbol(atom(token), line, column)
 
