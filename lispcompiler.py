@@ -153,7 +153,7 @@ def compile_function(definition, body, stream):
     name = definition[0].token
     args = definition[1:]
     if name != 'main':
-        stream.write('%s: \n', name)
+        stream.write('%s: \n' % name)
     for expr in body:
         compile_expr(expr, stream)
 
