@@ -74,11 +74,33 @@ def compile_binop(op):
     def compile_op(self, args, stream):
         if len(args) != 2:
             raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+        for expr in args:
+            compile_expr(expr, stream)
+        stream.write(op + '\n')
     return compile_op
+
+def compile_uniop(op):
+    def compile_op(self, args, stream):
+        if len(args) != 1:
+            raise sym_error('Expected 1 argument, got %d' % len(args), self)
+        compile_expr(args[0], stream)
+        stream.write(op + '\n')
+    return compile_op
+
+# TODO: LD, SEL, JOIN, LDF, AP, RTN, DUM, RAP, STOP, TSEL, TAP, TRAP, ST, DEBUG, BRK
 
 builtins = {
     '+': compile_binop('ADD'),
-    '-': compile_binop('SUB')
+    '-': compile_binop('SUB'),
+    '*': compile_binop('MUL'),
+    '/': compile_binop('DIV'),
+    '=': compile_binop('CEQ'),
+    '>': compile_binop('CGT'),
+    '>=': compile_binop('CGTE'),
+    'cons': compile_binop('CONS'),
+    'atom?': compile_uniop('ATOM'),
+    'car': compile_uniop('CAR'),
+    'cdr': compile_uniop('CDR'),
 }
 
 symtable = {}
@@ -100,7 +122,7 @@ def compile_lisp(exprlist):
     stream = StringIO()
     for expr in exprlist:
         compile_function(expr[1], expr[2:], stream)
-    print stream.getvalue()
+    return stream.getvalue()
 
 def compile_apply(self, args, stream):
     # Dispatch based on type
@@ -114,11 +136,16 @@ def compile_apply(self, args, stream):
     else:
         raise sym_error("Undefined reference to '%s'" % self.token, self)
 
+def compile_var(self, stream):
+    pass
+
 def compile_expr(expr, stream):
     if isinstance(expr, list):
         compile_apply(expr[0], expr[1:], stream)
     elif isinstance(expr.token, int):
         compile_atom(expr, stream)
+    elif isinstance(expr.token, str):
+        compile_var(expr, stream)
     else:
         raise sym_error("Unknown type: %s" % str(type(expr)), expr)
 
@@ -137,7 +164,8 @@ def main():
 
     with open(sys.argv[1]) as f:
         try:
-            compile_lisp(parse(f.read().strip()))
+            code = compile_lisp(parse(f.read().strip()))
+            sys.stdout.write(code)
         except CompileError, e:
             sys.stderr.write(str(e) + '\n')
 

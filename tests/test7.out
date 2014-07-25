@@ -1,0 +1,5 @@
+LDC 4
+LDC 15
+LDC 3
+DIV
+ADD
