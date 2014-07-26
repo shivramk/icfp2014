@@ -81,8 +81,23 @@ def subscript_handler(node):
     subs = node.subs
     assert len(subs) == 1
     exprType = node_type(node.expr)
+    
+    # HACK for handling subscripts on variables.
+    # All tuple variables need to start with t_ :D
+    # Everything else is assumed to be a list
+    if exprType == 'Name':
+        if node.expr.name.startswith('t_'):
+            exprType = 'Tuple'
+        else:
+            exprType = 'List'
+            
     assert exprType == 'List' or exprType == 'Tuple'
     return ['get' + exprType.lower() + 'elem'] + [convert(node.expr), convert(subs[0])]
+    
+def assign_handler(node):
+    assert len(node.nodes) == 1
+    
+    return ['set!', node.nodes[0].name, convert(node.expr)]
     
 synmap = {
     'Module': module_handler,
@@ -104,7 +119,8 @@ synmap = {
     'Name': name_handler,
     'Tuple': tuple_handler,
     'List': list_handler,
-    'Subscript': subscript_handler
+    'Subscript': subscript_handler,
+    'Assign': assign_handler
 }
 
 def convert(node):
