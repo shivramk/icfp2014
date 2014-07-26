@@ -51,7 +51,6 @@ def if_handler(node):
     return ret
 
 def compare_handler(node):
-    print node.ops[0][0]
     return [node.ops[0][0], convert(node.expr), convert(node.ops[0][1])]
 
 def format_expr(expr):
@@ -122,6 +121,9 @@ synmap = {
     'FloorDiv': bin_op('/'), # Wonder if this is correct
     'LeftShift': bin_op('ash'),
     'RightShift': bin_op('ash'), # FIXME
+    'UnarySub': bin_op('-'),
+    'Not': bin_op('not'),
+    'And': bin_op('and'),
     'Compare': compare_handler,
     'If': if_handler,
     'Name': name_handler,
