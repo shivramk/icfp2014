@@ -4,7 +4,7 @@ import sys
 import compiler
 import compiler.ast as AST
 import operator
-from lispcompiler import compile_lisp, CompileError, Symbol
+from lispcompiler import compile_lisp, CompileError, Symbol, parse
 
 # There ought to be a better way of doing this
 node_type = lambda node: node.__class__.__name__
@@ -51,6 +51,7 @@ def if_handler(node):
     return ret
 
 def compare_handler(node):
+    print node.ops[0][0]
     return [node.ops[0][0], convert(node.expr), convert(node.ops[0][1])]
 
 def format_expr(expr):
@@ -128,7 +129,7 @@ synmap = {
     'List': list_handler,
     'Subscript': subscript_handler,
     'Assign': assign_handler,
-    'NoneType': lambda x: AST.Const(0)
+    'NoneType': lambda x: 0
 }
 
 def convert(node):
@@ -149,10 +150,12 @@ def tree2sym(expr):
 def compile(fin):
     ast = compiler.parseFile(fin)
     exprs = convert(ast)
+    exprstr = ''
     for expr in exprs:
-        print format_expr(expr)
+        exprstr += format_expr(expr) + '\n'
+    print exprstr
     try:
-        code = compile_lisp(tree2sym(exprs))
+        code = compile_lisp(parse(open("stdlib.lisp").read() + exprstr))
         sys.stdout.write(code)
     except CompileError, e:
         sys.stderr.write(str(e) + '\n')
