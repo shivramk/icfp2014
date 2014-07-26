@@ -6,6 +6,9 @@ Symbol = namedtuple('Symbol', ['token', 'line', 'column'])
 
 class CompileError(Exception): pass
 
+def sym(token, s):
+    return Symbol(token, s.line, s.column)
+
 def sym_error_lc(message, line, column):
     return CompileError("Error: Line %d, column %d: %s" % (line,
         column, message))
@@ -16,21 +19,24 @@ def sym_error(message, symbol):
 def semantic_error(message):
     return CompileError("Error: %s" % message)
 
-# TODO: SEL, JOIN, STOP, TSEL, TAP, TRAP, DEBUG, BRK
+# TODO: STOP, TSEL, TAP, TRAP, DEBUG, BRK
 
 class Assembler(object):
     def __init__(self):
+        self.counter = 1
         self.instrs = []
         self.markers = {}
 
     def get_marker(self, name=None):
         if name is None:
-            name = "loc" + str(len(self.markers))
+            name = "loc" + str(self.counter)
+            self.counter += 1
         if name in self.markers:
             semantic_error("Redefinition of symbol: '%s'" % (name))
         return name
 
     def insert_marker(self, name):
+        # print 'inserting', name, len(self.instrs)
         self.markers[name] = len(self.instrs)
 
     def fix_ref_(self, instr):
@@ -41,6 +47,7 @@ class Assembler(object):
                 instr[idx] = self.markers[arg]
 
     def add_instr(self, instr):
+        # print instr
         self.instrs.append(instr)
 
     def get_program(self):
@@ -59,6 +66,7 @@ class Scope(object):
         self.instrs = []
         self.references = {}
         self.args = {}
+        self.blocks = []
 
     def lookup(self, var):
         if var in self.references:
@@ -83,6 +91,12 @@ class Scope(object):
             raise semantic_error("Cant mutate variables from parent scope")
         self.add_instr("ST", level, ref)
 
+    def get_marker(self, name=None):
+        return self.assembler.get_marker(name)
+
+    def insert_marker(self, marker):
+        self.instrs.append(marker)
+
     def load_var(self, var):
         level, ref = self.lookup(var)
         if ref is None:
@@ -97,6 +111,11 @@ class Scope(object):
         scope = Scope(self)
         self.instrs.append(scope)
         return scope
+
+    def insert_code(self):
+        code = CodeBlock(self)
+        self.blocks.append(code)
+        return code
 
     def has_references(self):
         return len(self.references) > 0
@@ -114,8 +133,16 @@ class Scope(object):
         for instr in self.instrs:
             if isinstance(instr, Scope):
                 instr.compile()
-            else:
+            elif isinstance(instr, list):
                 self.assembler.add_instr(instr)
+            elif isinstance(instr, str):
+                # A marker
+                self.assembler.insert_marker(instr)
+            else:
+                assert False
+        self.assembler.add_instr(["RTN"])
+        for block in self.blocks:
+            block.compile()
         
 class Function(Scope):
     def __init__(self, parent=None):
@@ -129,7 +156,31 @@ class Function(Scope):
         self.assembler.add_instr(["RTN"])
         self.assembler.insert_marker(marker)
         self.instrs[0].compile()
-        self.assembler.add_instr(["RTN"])
+
+class CodeBlock(Scope):
+    def __init__(self, parent=None):
+        Scope.__init__(self, parent)
+        self.marker = self.get_marker()
+
+    def lookup(self, var):
+        return self.parent.lookup(var)
+
+    def set_var(self, var):
+        self.parent.set_var(var)
+
+    def compile(self):
+        self.assembler.insert_marker(self.marker)
+        for instr in self.instrs:
+            if isinstance(instr, list):
+                self.assembler.add_instr(instr)
+            elif isinstance(instr, str):
+                # A marker
+                self.assembler.insert_marker(instr)
+            else:
+                assert False
+        self.assembler.add_instr(["JOIN"])
+        for block in self.blocks:
+            block.compile()
 
 def tokenize(s):
     line, column = 1, 1
@@ -185,6 +236,17 @@ def atom(token):
         except ValueError:
             return token
 
+def compile_if(self, args, stream):
+    if len(args) != 3:
+        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+    compile_expr(args[0], stream)
+    code1 = stream.insert_code()
+    code2 = stream.insert_code()
+    stream.add_instr("SEL", code1.marker, code2.marker)
+
+    compile_expr(args[1], code1)
+    compile_expr(args[2], code2)
+
 def compile_binop(op):
     def compile_op(self, args, stream):
         if len(args) != 2:
@@ -208,6 +270,14 @@ def compile_set(self, args, stream):
     compile_expr(args[1], stream)
     stream.set_var(args[0].token)
 
+def compile_lte(self, args, stream):
+    return compile_if(sym('if', self),
+            [[sym('>', self)] + args, sym(0, self), sym(1, self)], stream)
+
+def compile_lt(self, args, stream):
+    return compile_if(sym('if', self),
+            [[sym('>=', self)] + args, sym(0, self), sym(1, self)], stream)
+
 builtins = {
     '+': compile_binop('ADD'),
     '-': compile_binop('SUB'),
@@ -221,6 +291,9 @@ builtins = {
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
     'set!': compile_set,
+    'if': compile_if,
+    '<': compile_lte,
+    '<=': compile_lte,
 }
 
 symtable = {}
