@@ -82,6 +82,11 @@ def subscript_handler(node):
     assert len(subs) == 1
     exprType = node_type(node.expr)
     
+    # ASSUMPTION is everything embedded in a collection is a List.
+    # Tuples embedded in Tuples/Lists will be assumed to be lists!
+    if exprType == 'Subscript':
+        return ['getlistelem'] + subscript_handler(node.expr) + [convert(subs[0])]
+    
     # HACK for handling subscripts on variables.
     # All tuple variables need to start with t_ :D
     # Everything else is assumed to be a list
@@ -90,8 +95,10 @@ def subscript_handler(node):
             exprType = 'Tuple'
         else:
             exprType = 'List'
-            
-    assert exprType == 'List' or exprType == 'Tuple'
+    
+    if exprType != 'List' and exprType != 'Tuple':
+        raise CompileError('Subscript on ' + exprType + ' not supported: ' + str(node.expr))
+        
     return ['get' + exprType.lower() + 'elem'] + [convert(node.expr), convert(subs[0])]
     
 def assign_handler(node):
