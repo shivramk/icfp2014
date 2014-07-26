@@ -327,7 +327,12 @@ def compile_function_call(self, args, stream):
 
 def compile_apply(self, args, stream):
     # Dispatch based on type
-    if self.token in builtins:
+    if isinstance(self, list):
+        for arg in args:
+            compile_expr(arg, stream)
+        compile_expr(self, stream)
+        stream.add_instr("AP", len(args))
+    elif self.token in builtins:
         builtins[self.token](self, args, stream)
     elif self.token in symtable:
         compile_function_call(self, args, stream)
@@ -337,7 +342,14 @@ def compile_apply(self, args, stream):
         raise sym_error("Undefined reference to '%s'" % self.token, self)
 
 def compile_var(self, stream):
-    stream.load_var(self.token)
+    # Check if this is a local
+    level, ref = stream.lookup(self.token)
+    if ref is not None:
+        stream.load_var(self.token)
+    elif self.token in symtable:
+        stream.add_instr("LDF", symtable[self.token])
+    else:
+        raise sym_error("Undefined reference to '%s'" % self.token, self)
 
 def compile_expr(expr, stream):
     if isinstance(expr, list):
