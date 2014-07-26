@@ -42,11 +42,11 @@ def name_handler(node):
 
 def if_handler(node):
     children = node.getChildren()
-    ret = ['if', convert(children[0])] + convert(children[1])
+    ret = ['if', convert(children[0]), convert(children[1])]
 
     # If there is an else block
     if len(children) > 2:
-        ret.extend(convert(children[2]))
+        ret.append(convert(children[2]))
     
     return ret
 

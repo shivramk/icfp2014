@@ -238,7 +238,7 @@ def atom(token):
 
 def compile_if(self, args, stream):
     if len(args) != 3:
-        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+        raise sym_error('Expected 3 arguments, got %d' % len(args), self)
     compile_expr(args[0], stream)
     code1 = stream.insert_code()
     code2 = stream.insert_code()

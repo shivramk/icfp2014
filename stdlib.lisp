@@ -7,3 +7,9 @@
       (if (atom? (cdr x)) (cdr x)
         (gettupleelem (cdr x) (- n 1)))
       (gettupleelem (cdr x) (- n 1)))))
+
+(define (len x) (length1 x 0))
+
+(define (length1 x l)
+  (if (atom? x) l
+    (length1 (cdr x) (+ l 1))))
