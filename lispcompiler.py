@@ -50,12 +50,21 @@ class Assembler(object):
         # print instr
         self.instrs.append(instr)
 
+    def find_loc(self, loc):
+        for key, value in self.markers.iteritems():
+            if value == loc:
+                return key
+        return None
+
     def get_program(self):
         # First fix all references
         for instr in self.instrs:
             self.fix_ref_(instr)
         s = StringIO()
-        for instr in self.instrs:
+        for idx, instr in enumerate(self.instrs):
+            name = self.find_loc(idx)
+            if name is not None:
+                s.write("; " + name + "\n")
             s.write(" ".join(str(v) for v in instr) + "\n")
         return s.getvalue()
 
@@ -278,6 +287,16 @@ def compile_lt(self, args, stream):
     return compile_if(sym('if', self),
             [[sym('>=', self)] + args, sym(0, self), sym(1, self)], stream)
 
+def compile_ne(self, args, stream):
+    return compile_if(sym('if', self),
+            [[sym('=', self)] + args, sym(0, self), sym(1, self)], stream)
+
+def compile_debug(self, args, stream):
+    if len(args) != 1:
+        raise sym_error('Expected 1 argument, got %d' % len(args), self)
+    compile_expr(args[0], stream)
+    stream.add_instr("DBUG")
+
 builtins = {
     '+': compile_binop('ADD'),
     '-': compile_binop('SUB'),
@@ -294,6 +313,8 @@ builtins = {
     'if': compile_if,
     '<': compile_lte,
     '<=': compile_lte,
+    '!=': compile_ne,
+    'debug': compile_debug,
 }
 
 symtable = {}
