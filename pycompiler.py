@@ -17,7 +17,10 @@ def module_handler(node):
     return convert(node.getChildNodes()[0])
 
 def stmt_handler(node):
-    return map(convert, node.getChildNodes())
+    children = node.getChildNodes()
+    if len(children) == 1:
+        return convert(children[0])
+    return map(convert, children)
 
 def discard_handler(node):
     return convert(node.getChildren()[0])
@@ -32,7 +35,7 @@ def return_handler(node):
     return convert(node.getChildNodes()[0])
 
 def function_handler(node):
-    return ['define', [node.name] + list(node.argnames)] + convert(node.code)
+    return ['define', [node.name] + list(node.argnames), convert(node.code)]
 
 def call_func_handler(node):
     return [node.node.name] + map(convert, node.args)
@@ -145,6 +148,8 @@ def convert(node):
 
 def tree2sym(expr):
     if isinstance(expr, list):
+        if len(expr) == 1:
+            return [tree2sym(expr[0])]
         return [tree2sym(e) for e in expr]
     else:
         return Symbol(expr, 1, 1)
@@ -155,10 +160,11 @@ def compile(fin):
     exprstr = ''
     for expr in exprs:
         exprstr += format_expr(expr) + '\n'
-    print exprstr
+    print >>sys.stderr, exprstr
     try:
-        code = compile_lisp(parse(open("stdlib.lisp").read() + exprstr))
-        sys.stdout.write(code)
+        with open('stdlib.lisp') as f:
+            code = compile_lisp(parse(f.read()) + tree2sym(exprs))
+            # sys.stdout.write(code)
     except CompileError, e:
         sys.stderr.write(str(e) + '\n')
 
