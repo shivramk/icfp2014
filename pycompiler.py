@@ -58,6 +58,25 @@ def format_expr(expr):
         return '(' + " ".join(map(format_expr, expr)) + ')'
     return str(expr)
 
+def cons_children_handler(children):
+    assert len(children) > 0
+    
+    if len(children) == 1:
+        return convert(children[0])
+        
+    if len(children) == 2:
+        return ['cons'] + map(convert, children)
+    
+    return ['cons', convert(children[0]), cons_children_handler(children[1:])]
+
+def tuple_handler(node):
+    children = node.getChildren()
+    assert len(children) > 1
+    return cons_children_handler(children)
+    
+def list_handler(node):
+    return cons_children_handler(node.getChildren() + (AST.Const(0),))
+
 synmap = {
     'Module': module_handler,
     'Stmt': stmt_handler,
@@ -75,7 +94,9 @@ synmap = {
     'RightShift': bin_op('ash'), # FIXME
     'Compare': compare_handler,
     'If': if_handler,
-    'Name': name_handler
+    'Name': name_handler,
+    'Tuple': tuple_handler,
+    'List': list_handler,
 }
 
 def convert(node):
