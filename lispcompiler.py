@@ -268,16 +268,24 @@ def compile_binop(op):
 def compile_uniop(op):
     def compile_op(self, args, stream):
         if len(args) != 1:
-            raise sym_error('Expected 1 argument, got %d' % len(args), self)
+            raise sym_error('%s Expected 1 argument, got %d' % (op, len(args)), self)
         compile_expr(args[0], stream)
         stream.add_instr(op)
     return compile_op
 
 def compile_set(self, args, stream):
     if len(args) != 2:
-        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+        raise sym_error('%s Expected 2 arguments, got %d' % (self.token, len(args)), self)
     compile_expr(args[1], stream)
     stream.set_var(args[0].token)
+
+def compile_sub(self, args, stream):
+    if len(args) == 1:
+        compile_binop('SUB')(self, [sym(0, self)] + args, stream)
+    elif len(args) == 2:
+        compile_binop('SUB')(self, args, stream)
+    else:
+        raise sym_error('Expected 1 or 2 arguments, got %d' % len(args), self)
 
 def compile_lte(self, args, stream):
     return compile_if(sym('if', self),
@@ -291,15 +299,26 @@ def compile_ne(self, args, stream):
     return compile_if(sym('if', self),
             [[sym('=', self)] + args, sym(0, self), sym(1, self)], stream)
 
+def compile_not(self, args, stream):
+    return compile_if(sym('if', self),
+            [args[0], sym(0, self), sym(1, self)], stream)
+
+def compile_and(self, args, stream):
+    if len(args) != 2:
+        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+    return compile_if(sym('if', self), [args[0], 
+                [sym('if', self), args[1], sym(1, self), sym(0, self)], 
+                sym(0, self)], stream)
+
 def compile_debug(self, args, stream):
     if len(args) != 1:
-        raise sym_error('Expected 1 argument, got %d' % len(args), self)
+        raise sym_error('debug Expected 1 argument, got %d' % len(args), self)
     compile_expr(args[0], stream)
     stream.add_instr("DBUG")
 
 builtins = {
     '+': compile_binop('ADD'),
-    '-': compile_binop('SUB'),
+    '-': compile_sub,
     '*': compile_binop('MUL'),
     '/': compile_binop('DIV'),
     '=': compile_binop('CEQ'),
@@ -311,10 +330,12 @@ builtins = {
     'cdr': compile_uniop('CDR'),
     'set!': compile_set,
     'if': compile_if,
-    '<': compile_lte,
+    '<': compile_lt,
     '<=': compile_lte,
     '!=': compile_ne,
     'debug': compile_debug,
+    'not': compile_not,
+    'and': compile_and
 }
 
 symtable = {}
