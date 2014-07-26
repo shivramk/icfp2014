@@ -77,6 +77,13 @@ def tuple_handler(node):
 def list_handler(node):
     return cons_children_handler(node.getChildren() + (AST.Const(0),))
 
+def subscript_handler(node):
+    subs = node.subs
+    assert len(subs) == 1
+    exprType = node_type(node.expr)
+    assert exprType == 'List' or exprType == 'Tuple'
+    return ['get' + exprType.lower() + 'elem'] + [convert(node.expr), convert(subs[0])]
+    
 synmap = {
     'Module': module_handler,
     'Stmt': stmt_handler,
@@ -97,6 +104,7 @@ synmap = {
     'Name': name_handler,
     'Tuple': tuple_handler,
     'List': list_handler,
+    'Subscript': subscript_handler
 }
 
 def convert(node):
