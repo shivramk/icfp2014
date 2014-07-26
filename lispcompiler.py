@@ -91,14 +91,16 @@ class Scope(object):
     def add_var(self, var):
         self.references[var] = len(self.references)
 
-    def set_var(self, var):
+    def set_var(self, var, gen_instr=True):
         level, ref = self.lookup(var)
         if ref is None:
             self.add_var(var)
             level, ref = 0, len(self.references) - 1
         if level != 0:
             raise semantic_error("Cant mutate variables from parent scope")
-        self.add_instr("ST", level, ref)
+        if gen_instr:
+            self.add_instr("ST", level, ref)
+        return level, ref
 
     def get_marker(self, name=None):
         return self.assembler.get_marker(name)
@@ -174,8 +176,11 @@ class CodeBlock(Scope):
     def lookup(self, var):
         return self.parent.lookup(var)
 
-    def set_var(self, var):
-        self.parent.set_var(var)
+    def set_var(self, var, gen_instr=True):
+        level, ref = self.parent.set_var(var, False)
+        if gen_instr:
+            self.add_instr("ST", level, ref)
+        return level, ref
 
     def compile(self):
         self.assembler.insert_marker(self.marker)
@@ -295,6 +300,10 @@ def compile_lt(self, args, stream):
     return compile_if(sym('if', self),
             [[sym('>=', self)] + args, sym(0, self), sym(1, self)], stream)
 
+def compile_do(self, args, stream):
+    for expr in args:
+        compile_expr(expr, stream)
+
 def compile_ne(self, args, stream):
     return compile_if(sym('if', self),
             [[sym('=', self)] + args, sym(0, self), sym(1, self)], stream)
@@ -309,6 +318,11 @@ def compile_and(self, args, stream):
     return compile_if(sym('if', self), [args[0], 
                 [sym('if', self), args[1], sym(1, self), sym(0, self)], 
                 sym(0, self)], stream)
+
+def compile_or(self, args, stream):
+    if len(args) != 2:
+        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+    return compile_if(sym('if', self), [args[0], sym(1, self), args[1]], stream)
 
 def compile_debug(self, args, stream):
     if len(args) != 1:
@@ -328,6 +342,7 @@ builtins = {
     'atom?': compile_uniop('ATOM'),
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
+    'do': compile_do,
     'set!': compile_set,
     'if': compile_if,
     '<': compile_lt,
@@ -335,7 +350,8 @@ builtins = {
     '!=': compile_ne,
     'debug': compile_debug,
     'not': compile_not,
-    'and': compile_and
+    'and': compile_and,
+    'or': compile_or,
 }
 
 symtable = {}

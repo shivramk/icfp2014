@@ -2,14 +2,41 @@
   (set! row (getlistelem map y))
   (getlistelem row x))
 
-(define (analyzepos map x y val)
-  (if (!= (at map x y) 0)
-    (if (!= (at map x y) 6) val -1) -1))
+(define (max a b)
+  (if (> a b) a b))
 
-(define (analyzepos2 map x y val)
-  (if (= (at map x y) 2) val
-    (if (= (at map x y) 3) val
-      (if (= (at map x y) 4) val -1))))
+(define (max4 a b c d)
+  (max a (max b (max c d))))
+
+(define (maxidx1 list curidx maxidx maxval)
+  (if (atom? list) maxidx
+    (if (> (car list) maxval)
+      (maxidx1 (cdr list) (+ curidx 1) curidx (car list))
+      (maxidx1 (cdr list) (+ curidx 1) maxidx maxval))))
+
+(define (maxidx l)
+  (maxidx1 (cdr l) 1 0 (car l)))
+
+(define (item-score v)
+  (if (= v 0) -1000000
+    (if (= v 1) 1
+      (if (= v 2) 10
+        (if (= v 3) 50
+          (if (= v 4) 100
+            (if (= v 5) -100 -1000)))))))
+
+(define (score width height map x y s depth)
+  (if (or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) 0
+    (if (<= depth 0) s
+      (if (< s -100000) s
+          (best-score width height map x y s (- depth 1) (item-score (at map x y)))))))
+
+(define (best-score width height map x y s depth v)
+   (max4
+     (score width height map (- x 1) y (+ s v) depth)
+     (score width height map (+ x 1) y (+ s v) depth)
+     (score width height map x (- y 1) (+ s v) depth)
+     (score width height map x (+ y 1) (+ s v) depth)))
 
 (define (make_move worldstate)
   (set! worldmap (gettupleelem worldstate 0))
@@ -19,24 +46,15 @@
   (set! lpos (gettupleelem lambdastate 1))
   (set! x (gettupleelem lpos 0))
   (set! y (gettupleelem lpos 1))
-  (set! legal 0)
-  (set! l1 (if (> y 0) (analyzepos worldmap x (- y 1) 0) -1))
-  (set! l2 (if (< x (- width 1)) (analyzepos worldmap (+ x 1) y 1) -1))
-  (set! l3 (if (< y (- height 1)) (analyzepos worldmap x (+ y 1) 2) -1))
-  (set! l4 (if (> x 0) (analyzepos worldmap (- x 1) y 3) -1))
-  (set! m1 (if (> y 0) (analyzepos2 worldmap x (- y 1) 0) -1))
-  (set! m2 (if (< x (- width 1)) (analyzepos2 worldmap (+ x 1) y 1) -1))
-  (set! m3 (if (< y (- height 1)) (analyzepos2 worldmap x (+ y 1) 2) -1))
-  (set! m4 (if (> x 0) (analyzepos2 worldmap (- x 1) y 3) -1))
-  (debug (at worldmap x y))
-  (if (!= m4 -1) m4
-    (if (!= m2 -1) m2
-      (if (!= m1 -1) m1
-        (if (!= m3 -1) m3
-          (if (!= l1 -1) l1
-            (if (!= l4 -1) l4
-              (if (!= l3 -1) l3
-                (if (!= l2 -1) l2 0)))))))))
+  (set! sleft  (score width height worldmap (- x 1) y 0 3))
+  (set! sright (score width height worldmap (+ x 1) y 0 3))
+  (set! sup    (score width height worldmap x (- y 1) 0 3))
+  (set! sdown  (score width height worldmap x (+ y 1) 0 3))
+  (debug sleft)
+  (debug sright)
+  (debug sup)
+  (debug sdown)
+  (maxidx (cons sup (cons sright (cons sdown (cons sleft 0))))))
 
 (define (step aistate worldstate) 
   (cons 0 (make_move worldstate)))
