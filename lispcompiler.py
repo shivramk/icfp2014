@@ -130,15 +130,6 @@ class Scope(object):
         return len(self.references) > 0
 
     def compile(self):
-        if self.has_references():
-            self.assembler.add_instr(["DUM", len(self.references)])
-            for i in self.references:
-                self.assembler.add_instr(["LDC", 0])
-            marker = self.assembler.get_marker()
-            self.assembler.add_instr(["LDF", marker])
-            self.assembler.add_instr(["RAP", len(self.references)])
-            self.assembler.add_instr(["RTN"])
-            self.assembler.insert_marker(marker)
         for instr in self.instrs:
             if isinstance(instr, Scope):
                 instr.compile()
@@ -158,13 +149,22 @@ class Function(Scope):
         Scope.__init__(self, parent)
 
     def compile(self):
-        marker = self.assembler.get_marker()
-        self.assembler.add_instr(["LDF", marker])
-        self.assembler.add_instr(["AP", 0])
         assert len(self.instrs) == 1 and isinstance(self.instrs[0], Scope)
+        scope = self.instrs[0]
+        marker = self.assembler.get_marker()
+        if scope.has_references():
+            # print scope.references
+            self.assembler.add_instr(["DUM", len(scope.references)])
+            for i in scope.references:
+                self.assembler.add_instr(["LDC", 0])
+            self.assembler.add_instr(["LDF", marker])
+            self.assembler.add_instr(["RAP", len(scope.references)])
+        else:
+            self.assembler.add_instr(["LDF", marker])
+            self.assembler.add_instr(["AP", 0])
         self.assembler.add_instr(["RTN"])
         self.assembler.insert_marker(marker)
-        self.instrs[0].compile()
+        scope.compile()
 
 class CodeBlock(Scope):
     def __init__(self, parent=None):
