@@ -32,7 +32,7 @@ def getBestMove(currentAIState, t_currentWorldState):
     return legal # Illegal move, not sure what to return
 
 def AIStepFunction(currentAIState, t_currentWorldState):
-    return currentAIState, getBestMove(currentAIState, t_initialWorldState)
+    return currentAIState, getBestMove(currentAIState, t_currentWorldState)
 
 def main(initialWorldState, undocumented):
     return 0, AIStepFunction
