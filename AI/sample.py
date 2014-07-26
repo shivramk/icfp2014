@@ -1,8 +1,8 @@
 # Representing AI state as a list with the following indices
 TICKS = 0
-SCORE = 0
-HEIGHT = 1
-WIDTH = 2
+SCORE = 1
+HEIGHT = 2
+WIDTH = 3
 
 # Map Encoding
 WALL = 0
@@ -74,9 +74,8 @@ def parse(worldMap):
             
 def getBestMove(currentAIState, currentWorldState):
     worldMap = currentWorldState[0]
-    parsedMap = parse(worldMap)
-    lambdaPos = parsedMap[0]
-    x, y = lambdaPos
+    lambdaStatus = currentWorldState[1]
+    x, y = lambdaStatus[1]
     # Dumb logic, always returns first valid move from the sequence (urdl)
     if y > 0:
         if worldMap[y-1][x] != 0:
@@ -109,6 +108,7 @@ def Main(initialWorldState, undocumented):
 
 def getNewMap(oldMap, move):
     # This is dumb and will only consider lambdaman
+    # Right now, only used for testing
     newMap = []
     for row in oldMap:
         newMap.append(row[:])
