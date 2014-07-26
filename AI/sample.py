@@ -1,12 +1,16 @@
 # Representing AI state as a list with the following indices
 FUNCTIONS = 0
 
-GLOBALS = 1
+VARIABLES = 1
+
+GLOBALS = 2
 TICKS = 0
 HEIGHT = 1
 WIDTH = 2
 
-TIMERS = 2
+TIMERS = 3
+ORIGINAL = 0
+CURRENT = 1
 LAMBDATICKSTIMER = 0
 LAMBDAEATTIMER = 1
 GHOST1TICKSTIMER = 2
@@ -28,26 +32,51 @@ LAMBDAMAN = 5
 GHOST = 6
 LAMBDAGHOST = 7
 
+UP = 0
+RIGHT = 1
+DOWN = 2
+LEFT = 3
 
-def getNewPosition(oldPos, direction):
-    if direction == 0: #up
-        return (oldPos[0], oldPos[1] - 1)
-    if direction == 2: #down
-        return (oldPos[0], oldPos[1] - 1)
-    if direction == 1: #right
-        return (oldPos[0] + 1, oldPos[1])
-    return (oldPos[0] - 1, oldPos[1])
+WEIGHTS = (-100000, 0, 10, 1000, 100, -5000)
+def depthFirstSearch(x, y, worldMap, currentAIState, depth, lastMove):
+    # Since there is no 2x2, depth first search will not have
+    # too many problems
+    if not depth:
+        entity = worldMap[y][x]
+        return WEIGHTS[entity]
 
-"""
-def fruit1Valid(ticks):
-    return 127 * 200 <= ticks < 127 * 280
-
-def fruit2Valid(ticks):
-    return 127 * 400 <= ticks < 127 * 480
-"""
+    childScores = []
+    if (y > 0) and (lastMove != DOWN):
+        entity = worldMap[y-1][x]
+        if entity != WALL:
+            score = WEIGHTS[entity]
+            childScores.append(depthFirstSearch(x, y-1, worldMap, currentAIState, depth-1, UP))
+    if (y + 1 < currentAIState[GLOBALS][HEIGHT]) and (lastMove != UP):
+        entity = worldMap[y+1][x]
+        if entity != WALL:
+            score = WEIGHTS[entity]
+            childScores.append(depthFirstSearch(x, y+1, worldMap, currentAIState, depth-1, DOWN))
+    if x > 0 and (lastMove != RIGHT):
+        entity = worldMap[y][x-1]
+        if entity != WALL:
+            score = WEIGHTS[entity]
+            childScores.append(depthFirstSearch(x-1, y, worldMap, currentAIState, depth-1, LEFT))
+    if (x + 1 < currentAIState[GLOBALS][WIDTH]) and (lastMove != LEFT):
+        entity = worldMap[y][x-1]
+        if entity != WALL:
+            score = WEIGHTS[entity]
+            childScores.append(depthFirstSearch(x-1, y, worldMap, currentAIState, depth-1, RIGHT))
+    if not childScores:
+        return (lastMove + 2) % 4
+    maxScore = max(childScores)
+    minScore = min(childScores)
+    if minScore < 0:
+        return minScore
+    return maxScore
 
 ######## Sequence in which map should be updated ######
 def lambdaGhostMove(currentAIState):
+    
     return currentAIState
 
 def actions(currentAIState):
@@ -67,7 +96,7 @@ def checkLambdaLoss(currentAIState):
 
 def incrementTick(currentAIState):
     ticks = currentAIState[GLOBALS][TICKS] + 1
-    return [ticks] + currentAIState[1:]
+    return currentAIState[:GLOBALS] + [[ticks] + currentAIState[GLOBALS][1:]] + currentAIState[GLOBALS + 1:]
 
 t_Sequence = (lambdaGhostMove, actions, eat, dealWithGhosts,
         checkLambdaWin, checkLambdaLoss, incrementTick)
@@ -77,38 +106,42 @@ def makeMove(currentAIState):
         return y(x) 
     return reduce(f, t_Sequence, currentAIState)
 
-def getBestMove(currentAIState, t_currentWorldState):
+def getBestMove(currentAIState, t_currentWorldState, depth):
     worldMap = t_currentWorldState[0]
     t_lambdaStatus = t_currentWorldState[1]
-    print t_currentWorldState
     x, y = t_lambdaStatus[1]
     # Dumb logic, always returns first valid move from the sequence (urdl)
-    legal = 0
+    bestScore = -100000
+    bestMove = 0 # If there is no legal move, 0 does not matter
     if y > 0:
         if (worldMap[y-1][x] != WALL):
-            legal = 0
-            if (worldMap[y-1][x] != GHOST):
-                return 0
+            score = depthFirstSearch(x, y-1, worldMap, currentAIState, depth, UP)
+            if score > bestScore:
+                bestScore = score
+                bestMove = UP
     if x < currentAIState[GLOBALS][WIDTH] - 1:
         if (worldMap[y][x+1] != WALL):
-            legal = 1
-            if (worldMap[y][x+1] != GHOST):
-                return 1
+            score = depthFirstSearch(x+1, y, worldMap, currentAIState, depth, RIGHT)
+            if score > bestScore:
+                bestScore = score
+                bestMove = RIGHT
     if y < currentAIState[GLOBALS][HEIGHT] - 1:
         if (worldMap[y+1][x] != WALL):
-            legal = 2
-            if (worldMap[y+1][x] != GHOST):
-                return 2
+            score = depthFirstSearch(x, y+1, worldMap, currentAIState, depth, DOWN)
+            if score > bestScore:
+                bestScore = score
+                bestMove = DOWN
     if x > 0:
         if (worldMap[y][x-1] != WALL):
-            legal = 3
-            if (worldMap[y][x-1] != GHOST):
-                return 3
-    return legal # Illegal move, not sure what to return
+            score = depthFirstSearch(x-1, y, worldMap, currentAIState, depth, LEFT)
+            if score > bestScore:
+                bestScore = score
+                bestMove = LEFT
+    return bestMove
 
 def Main(initialWorldState, undocumented):
     def AIStepFunction(currentAIState, currentWorldState):
-        bestMove = getBestMove(currentAIState, currentWorldState)
+        bestMove = getBestMove(currentAIState, currentWorldState, 4)
         currentAIState = makeMove(currentAIState)
         return currentAIState, bestMove
 
@@ -119,6 +152,7 @@ def Main(initialWorldState, undocumented):
 
     initialAIState = []
     initialAIState.append([]) # Functions should go here
+    initialAIState.append([]) # Variables if any
 
     initialAIState.append([])
     initialAIState[GLOBALS].append(0) # No ticks so far
