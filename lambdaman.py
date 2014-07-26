@@ -4,7 +4,9 @@ def getBestMove(currentAIState, t_currentWorldState):
     # print t_currentWorldState
     height = len(worldMap)
     width = len(worldMap[0])
-    x, y = t_lambdaStatus[1]
+    x = t_lambdaStatus[1][0]
+    y = t_lambdaStatus[1][1]
+
     # Dumb logic, always returns first valid move from the sequence (urdl)
     legal = 0
     if y > 0:
@@ -32,5 +34,5 @@ def getBestMove(currentAIState, t_currentWorldState):
 def AIStepFunction(currentAIState, t_currentWorldState):
     return currentAIState, getBestMove(currentAIState, t_initialWorldState)
 
-def Main(initialWorldState, undocumented):
+def main(initialWorldState, undocumented):
     return 0, AIStepFunction

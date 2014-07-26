@@ -127,7 +127,8 @@ synmap = {
     'Tuple': tuple_handler,
     'List': list_handler,
     'Subscript': subscript_handler,
-    'Assign': assign_handler
+    'Assign': assign_handler,
+    'NoneType': lambda x: AST.Const(0)
 }
 
 def convert(node):
