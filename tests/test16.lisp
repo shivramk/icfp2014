@@ -1,1 +1,1 @@
-(define (main) (not (and 1 1)))
+(define (main) (- -10))

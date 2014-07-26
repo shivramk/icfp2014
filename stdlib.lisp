@@ -13,3 +13,7 @@
 (define (length1 x l)
   (if (atom? x) l
     (length1 (cdr x) (+ l 1))))
+
+(define (append x v)
+  (if (atom? x) (cons v 0)
+    (cons (car x) (append (cdr x) v))))
