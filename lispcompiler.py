@@ -1,5 +1,5 @@
 from collections import namedtuple
-from StringIO import StringIO
+from cStringIO import StringIO
 import sys
 
 Symbol = namedtuple('Symbol', ['token', 'line', 'column'])
@@ -15,6 +15,121 @@ def sym_error(message, symbol):
 
 def semantic_error(message):
     return CompileError("Error: %s" % message)
+
+# TODO: SEL, JOIN, STOP, TSEL, TAP, TRAP, DEBUG, BRK
+
+class Assembler(object):
+    def __init__(self):
+        self.instrs = []
+        self.markers = {}
+
+    def get_marker(self, name=None):
+        if name is None:
+            name = "loc" + str(len(self.markers))
+        if name in self.markers:
+            semantic_error("Redefinition of symbol: '%s'" % (name))
+        return name
+
+    def insert_marker(self, name):
+        self.markers[name] = len(self.instrs)
+
+    def fix_ref_(self, instr):
+        for idx, arg in enumerate(instr):
+            if idx == 0:
+                continue
+            if isinstance(arg, str):
+                instr[idx] = self.markers[arg]
+
+    def add_instr(self, instr):
+        self.instrs.append(instr)
+
+    def get_program(self):
+        # First fix all references
+        for instr in self.instrs:
+            self.fix_ref_(instr)
+        s = StringIO()
+        for instr in self.instrs:
+            s.write(" ".join(str(v) for v in instr) + "\n")
+        return s.getvalue()
+
+class Scope(object):
+    assembler = Assembler()
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.instrs = []
+        self.references = {}
+        self.args = {}
+
+    def lookup(self, var):
+        if var in self.references:
+            return (0, self.references[var])
+        elif self.parent is not None:
+            level, ref = self.parent.lookup(var)
+            if ref is None:
+                return None, None
+            return (level + 1, ref)
+        else:
+            return None, None
+
+    def add_var(self, var):
+        self.references[var] = len(self.references)
+
+    def set_var(self, var):
+        level, ref = self.lookup(var)
+        if ref is None:
+            self.add_var(var)
+            level, ref = 0, len(self.references) - 1
+        if level != 0:
+            raise semantic_error("Cant mutate variables from parent scope")
+        self.add_instr("ST", level, ref)
+
+    def load_var(self, var):
+        level, ref = self.lookup(var)
+        if ref is None:
+            raise semantic_error("Undefined reference to '%s'" % (var))
+        self.add_instr("LD", level, ref)
+
+    def add_instr(self, op, *args):
+        instr = [op] + list(args)
+        self.instrs.append(instr)
+
+    def insert_scope(self):
+        scope = Scope(self)
+        self.instrs.append(scope)
+        return scope
+
+    def has_references(self):
+        return len(self.references) > 0
+
+    def compile(self):
+        if self.has_references():
+            self.assembler.add_instr(["DUM", len(self.references)])
+            for i in self.references:
+                self.assembler.add_instr(["LDC", 0])
+            marker = self.assembler.get_marker()
+            self.assembler.add_instr(["LDF", marker])
+            self.assembler.add_instr(["RAP", len(self.references)])
+            self.assembler.add_instr(["RTN"])
+            self.assembler.insert_marker(marker)
+        for instr in self.instrs:
+            if isinstance(instr, Scope):
+                instr.compile()
+            else:
+                self.assembler.add_instr(instr)
+        
+class Function(Scope):
+    def __init__(self, parent=None):
+        Scope.__init__(self, parent)
+
+    def compile(self):
+        marker = self.assembler.get_marker()
+        self.assembler.add_instr(["LDF", marker])
+        self.assembler.add_instr(["AP", 0])
+        assert len(self.instrs) == 1 and isinstance(self.instrs[0], Scope)
+        self.assembler.add_instr(["RTN"])
+        self.assembler.insert_marker(marker)
+        self.instrs[0].compile()
+        self.assembler.add_instr(["RTN"])
 
 def tokenize(s):
     line, column = 1, 1
@@ -76,7 +191,7 @@ def compile_binop(op):
             raise sym_error('Expected 2 arguments, got %d' % len(args), self)
         for expr in args:
             compile_expr(expr, stream)
-        stream.write(op + '\n')
+        stream.add_instr(op)
     return compile_op
 
 def compile_uniop(op):
@@ -84,10 +199,14 @@ def compile_uniop(op):
         if len(args) != 1:
             raise sym_error('Expected 1 argument, got %d' % len(args), self)
         compile_expr(args[0], stream)
-        stream.write(op + '\n')
+        stream.add_instr(op)
     return compile_op
 
-# TODO: LD, SEL, JOIN, LDF, AP, RTN, DUM, RAP, STOP, TSEL, TAP, TRAP, ST, DEBUG, BRK
+def compile_set(self, args, stream):
+    if len(args) != 2:
+        raise sym_error('Expected 2 arguments, got %d' % len(args), self)
+    compile_expr(args[1], stream)
+    stream.set_var(args[0].token)
 
 builtins = {
     '+': compile_binop('ADD'),
@@ -101,12 +220,13 @@ builtins = {
     'atom?': compile_uniop('ATOM'),
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
+    'set!': compile_set,
 }
 
 symtable = {}
 
 def compile_atom(expr, stream):
-    stream.write("LDC %d\n" % (expr.token))
+    stream.add_instr("LDC", expr.token)
 
 def compile_lisp(exprlist):
     for idx, expr in enumerate(exprlist):
@@ -119,25 +239,32 @@ def compile_lisp(exprlist):
     # Move main to the top
     mainidx = symtable['main']
     exprlist.insert(0, exprlist.pop(mainidx))
-    stream = StringIO()
+    for key in symtable:
+        symtable[key] = Scope.assembler.get_marker(key)
     for expr in exprlist:
-        compile_function(expr[1], expr[2:], stream)
-    return stream.getvalue()
+        scope = compile_function(expr[1], expr[2:])
+        scope.compile()
+    return Scope.assembler.get_program()
+
+def compile_function_call(self, args, stream):
+    for arg in args:
+        compile_expr(arg, stream)
+    stream.add_instr("LDF", symtable[self.token])
+    stream.add_instr("AP", len(args))
 
 def compile_apply(self, args, stream):
     # Dispatch based on type
     if self.token in builtins:
         builtins[self.token](self, args, stream)
     elif self.token in symtable:
-        # TODO: Function call
-        pass
+        compile_function_call(self, args, stream)
     elif isinstance(self.token, int):
         compile_atom(self, stream)
     else:
         raise sym_error("Undefined reference to '%s'" % self.token, self)
 
 def compile_var(self, stream):
-    pass
+    stream.load_var(self.token)
 
 def compile_expr(expr, stream):
     if isinstance(expr, list):
@@ -149,13 +276,21 @@ def compile_expr(expr, stream):
     else:
         raise sym_error("Unknown type: %s" % str(type(expr)), expr)
 
-def compile_function(definition, body, stream):
+def compile_function(definition, body):
     name = definition[0].token
     args = definition[1:]
+    stream = Function()
+    stream.assembler.insert_marker(name)
+    local_scope = stream.insert_scope()
+    for arg in args:
+        stream.add_var(arg.token)
     if name != 'main':
-        stream.write('%s: \n' % name)
+        #stream.write('%s: \n' % name)
+        #TODO
+        pass
     for expr in body:
-        compile_expr(expr, stream)
+        compile_expr(expr, local_scope)
+    return stream
 
 def main():
     if len(sys.argv) != 2:
