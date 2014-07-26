@@ -384,7 +384,9 @@ def main():
 
     with open(sys.argv[1]) as f:
         try:
-            code = compile_lisp(parse(f.read().strip()))
+            # Read in the stdlib
+            stdlib = open("stdlib.lisp").read()
+            code = compile_lisp(parse(stdlib + f.read().strip()))
             sys.stdout.write(code)
         except CompileError, e:
             sys.stderr.write(str(e) + '\n')
