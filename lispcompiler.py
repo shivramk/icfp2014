@@ -78,8 +78,15 @@ class Scope(object):
         self.funcs = {}
         self.blocks = []
 
+    def lookup_func(self, f):
+        if f in self.funcs:
+            return self.funcs[f]
+        elif self.parent is not None:
+            return self.parent.lookup_func(f)
+        return None
+
     def lookup(self, var):
-        if var in self.funcs:
+        if self.lookup_func(var):
             return (0, 0) # Dummy
         if var in self.references:
             return (0, self.references[var])
@@ -112,8 +119,9 @@ class Scope(object):
         self.instrs.append(marker)
 
     def load_var(self, var):
-        if var in self.funcs:
-            self.add_instr("LDF", self.funcs[var])
+        funcaddr = self.lookup_func(var)
+        if funcaddr:
+            self.add_instr("LDF", funcaddr)
             return
         level, ref = self.lookup(var)
         if ref is None:
@@ -199,6 +207,7 @@ class CodeBlock(Scope):
         return level, ref
 
     def compile(self):
+        # print self.instrs
         self.assembler.insert_marker(self.marker)
         for instr in self.instrs:
             if isinstance(instr, list):
@@ -329,6 +338,15 @@ def compile_binop(op):
         stream.add_instr(op)
     return compile_op
 
+def compile_composite_uniop(ops):
+    def compile_ops(self, args, stream):
+        if len(args) != 1:
+            raise sym_error('%s Expected 1 argument, got %d' % (op, len(args)), self)
+        compile_expr(args[0], stream)
+        for op in reversed(ops):
+            stream.add_instr(op)
+    return compile_ops
+
 def compile_uniop(op):
     def compile_op(self, args, stream):
         if len(args) != 1:
@@ -401,6 +419,8 @@ builtins = {
     'atom?': compile_uniop('ATOM'),
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
+    'cadr': compile_composite_uniop(['CAR', 'CDR']),
+    'cddr': compile_composite_uniop(['CDR', 'CDR']),
     'define': compile_define,
     'cond': compile_cond,
     'do': compile_do,
