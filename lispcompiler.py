@@ -99,8 +99,8 @@ class Scope(object):
         if ref is None:
             self.add_var(var)
             level, ref = 0, len(self.references) - 1
-        if level != 0:
-            raise semantic_error("Cant mutate variables from parent scope")
+        # if level != 0:
+        #     raise semantic_error("Cant mutate variables from parent scope")
         if gen_instr:
             self.add_instr("ST", level, ref)
         return level, ref

@@ -1,0 +1,12 @@
+(define (incrementer x)
+  (define (inc)
+    (set! x (+ x 1))
+    x)
+  inc)
+
+(define (main) 
+  (set! i (incrementer 20))
+  (debug (i))
+  (debug (i))
+  (debug (i))
+  (debug (i)))
