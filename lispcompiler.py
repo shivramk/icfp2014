@@ -263,6 +263,26 @@ def compile_if(self, args, stream):
     if len(args) == 3:
         compile_expr(args[2], code2)
 
+def compile_cond(self, args, stream):
+    if len(args) < 2:
+        raise sym_error('Cond must have at least 2 arguments, got %d' % len(args), self)
+    for idx, arg in enumerate(args):
+        if not isinstance(arg, list):
+            raise sym_error('Cond expects expressions', arg)
+        if len(arg) != 2:
+            raise sym_error('Each cond expression must have 2 parts', arg)
+        if arg[0][0] == 'else':
+            if idx != len(args) - 1:
+                raise sym_error('else must be the last expression in a cond', arg)
+            compile_expr(arg[1], stream)
+        else:
+            compile_expr(arg[0], stream)
+            code1 = stream.insert_code()
+            code2 = stream.insert_code()
+            stream.add_instr("SEL", code1.marker, code2.marker)
+            compile_expr(arg[1], code1)
+            stream = code2
+
 def compile_binop(op):
     def compile_op(self, args, stream):
         if len(args) != 2:
@@ -344,6 +364,7 @@ builtins = {
     'atom?': compile_uniop('ATOM'),
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
+    'cond': compile_cond,
     'do': compile_do,
     'set!': compile_set,
     'if': compile_if,
