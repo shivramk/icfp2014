@@ -1,0 +1,14 @@
+Combination of breadth first and depth first search
+===================================================
+
+1. Set current lambdaman position as source
+2. Set next available direction from source as current direction, if no more
+    directions, go to step 6
+3. Traverse the path in current direction (straight line depth first) till
+    we find a pill, a power pill, a fruit, a corner or a junction.
+4. Push the endpoint found in 3 in a queue
+5. Go to step 2
+6. Pop from queue and set the popped endpoint as source. If queue is empty,
+    step 8
+7. Go to step 2
+8. Stop and return the score found so far
