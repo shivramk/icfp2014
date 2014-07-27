@@ -251,15 +251,17 @@ def atom(token):
             return token
 
 def compile_if(self, args, stream):
-    if len(args) != 3:
-        raise sym_error('Expected 3 arguments, got %d' % len(args), self)
+    if not (len(args) == 2 or len(args) == 3):
+        raise sym_error('Expected 2/3 arguments, got %d' % len(args), self)
     compile_expr(args[0], stream)
     code1 = stream.insert_code()
     code2 = stream.insert_code()
     stream.add_instr("SEL", code1.marker, code2.marker)
 
     compile_expr(args[1], code1)
-    compile_expr(args[2], code2)
+    # Optional else part
+    if len(args) == 3:
+        compile_expr(args[2], code2)
 
 def compile_binop(op):
     def compile_op(self, args, stream):
