@@ -23,3 +23,11 @@ Exec stage
     (since the forced bends are also considered junctions). Make the lambda man
     move there, and eat the pill
 5. Go to step 1
+
+Note: If step 3 in the init state is not possible, an approximate shortest path to a junction can be found at runtime in step 2 of exec stage, by the following greedy strategy
+1. Set Lambdaman's current junction point as the source JP.
+2. Iterate through all the junction points, which either have the same x
+    or same y coordinate as the source JP.
+2. Select the JP which is closest to the target JP.
+3. Make the lambdaman move to this JP
+4. Go to step 1
