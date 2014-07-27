@@ -35,6 +35,15 @@
       (minidx1 (cdr list) (+ curidx 1) curidx (car list))
       (minidx1 (cdr list) (+ curidx 1) minidx minval))))
 
+(define (find1 list elem idx)
+  (if (atom? list) 0
+    (if (= (car list) elem)
+      (cons idx (find1 (cdr list) elem (+ idx 1)))
+      (find1 (cdr list) elem (+ idx 1)))))
+
+(define (find list elem)
+  (find1 list elem 0))
+
 (define (maxidx l)
   (maxidx1 (cdr l) 1 0 (car l)))
 
