@@ -1,14 +1,39 @@
 Combination of breadth first and depth first search
 ===================================================
 
-1. Set current lambdaman position as source
-2. Set next available direction from source as current direction, if no more
-    directions, go to step 6
-3. Traverse the path in current direction (straight line depth first) till
-    we find a pill, a power pill, a fruit, a corner or a junction.
-4. Push the endpoint found in 3 in a queue
-5. Go to step 2
-6. Pop from queue and set the popped endpoint as source. If queue is empty,
-    step 8
-7. Go to step 2
-8. Stop and return the score found so far
+Initialization phase (1st 1 minute)
+----------------------------------
+1. Build a list of lists which will store y coordinate of
+    pills, power pills, fruits, bends (straight line dead
+    ends) per x, alongwith the cell score
+2. Build a list of lists which will store x coordinate of
+    pills, power pills, fruits, bends (straight line dead
+    ends) per y, alongwith the cell score
+
+Exec phase
+----------
+1. Set source = current lambdaman position
+2. Set vertical-list to the list stored in step 1 init,
+    indexed by x coordinate of source
+3. Find the element in 2 above, which is closest to source.
+    This is the straight line distance, so just difference
+    in y coordinates is enough to get the distance.
+    Ideally, there should be two elements, one with
+    +ve smallest distance, and another with -ve smallest
+    distance
+4. Push this element, along with its score to a queue
+5. Set horizontal-list to the list stored in step 2 init,
+    indexed by y coordinate of source
+6. Find the element in 2 above, which is closest to source.
+    This is the straight line distance, so just difference
+    in y coordinates is enough to get the distance.
+    Ideally, there should be two elements, one with
+    +ve smallest distance, and another with -ve smallest
+    distance
+7. Push this element, along with its score to a queue.
+    For proper termination, update depth after every push,
+    do not push if depth reaches threashold!
+8. Pop from queue and set the popped endpoint as source. If queue is empty,
+   go to step 10. 
+9. Go to step 2
+10. Stop and return the score found so far!
