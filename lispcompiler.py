@@ -397,7 +397,14 @@ def compile_apply(self, args, stream):
     elif isinstance(self.token, int):
         compile_atom(self, stream)
     else:
-        raise sym_error("Undefined reference to '%s'" % self.token, self)
+        level, ref = stream.lookup(self.token)
+        if ref is not None:
+            for arg in args:
+                compile_expr(arg, stream)
+            stream.load_var(self.token)
+            stream.add_instr("AP", len(args))
+        else:
+            raise sym_error("Undefined reference to '%s'" % self.token, self)
 
 def compile_var(self, stream):
     # Check if this is a local
