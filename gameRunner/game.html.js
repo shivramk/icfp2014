@@ -55,7 +55,7 @@ function runStep() {
     }
     else {
         //TODO: To print status at every step
-        //updateState()
+        updateState()
         //updateBoard(false)
     }
 }
@@ -88,10 +88,10 @@ function updateState() {
     //$("#lives").html(state.lives)
     //$("#ticks").html(state.ticks)
     //$("#score").html(state.score)
-    console.log("lives: " + state.lives + ", ticks: " + state.ticks + ", score: " + state.score);
+    console.log("lives: " + state.lives + ", ticks: " + state.ticks + ", score: " + state.score + ", cycles: " + g_instrCounter);
     if (state.traceval != null) {
         for (var index = 0; index < state.traceval.length; ++index) {
-            output(state.traceval[index]);
+            console.info(state.traceval[index]);
         }
     }
 }
