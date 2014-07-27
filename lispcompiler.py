@@ -215,8 +215,14 @@ class CodeBlock(Scope):
 def tokenize(s):
     line, column = 1, 1
     current_token = None
+    comment = False
     for ch in s:
-        if ch in (' ', '\t', '\n', '(', ')'):
+        if comment:
+            if ch == '\n':
+                line = line + 1
+                column = 0
+                comment = False
+        elif ch in (' ', '\t', '\n', '(', ')'):
             if current_token:
                 yield tuple(current_token)
                 current_token = None
@@ -225,6 +231,9 @@ def tokenize(s):
                 column = 0
             elif ch == '(' or ch == ')':
                 yield (ch, line, column)
+        elif ch == ';':
+            # Consume input till '\n'
+            comment = True
         elif not current_token:
             current_token = [ch, line, column]
         else:
