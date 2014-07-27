@@ -75,9 +75,12 @@ class Scope(object):
         self.instrs = []
         self.references = {}
         self.args = {}
+        self.funcs = {}
         self.blocks = []
 
     def lookup(self, var):
+        if var in self.funcs:
+            return (0, 0) # Dummy
         if var in self.references:
             return (0, self.references[var])
         elif self.parent is not None:
@@ -109,6 +112,9 @@ class Scope(object):
         self.instrs.append(marker)
 
     def load_var(self, var):
+        if var in self.funcs:
+            self.add_instr("LDF", self.funcs[var])
+            return
         level, ref = self.lookup(var)
         if ref is None:
             raise semantic_error("Undefined reference to '%s'" % (var))
@@ -118,15 +124,16 @@ class Scope(object):
         instr = [op] + list(args)
         self.instrs.append(instr)
 
-    def insert_scope(self):
-        scope = Scope(self)
-        self.instrs.append(scope)
-        return scope
-
     def insert_code(self):
         code = CodeBlock(self)
         self.blocks.append(code)
         return code
+
+    def insert_function(self, name):
+        scope = Function(name, self)
+        self.funcs[name] = scope.marker
+        self.blocks.append(scope)
+        return scope
 
     def has_references(self):
         return len(self.references) > 0
@@ -147,15 +154,24 @@ class Scope(object):
             block.compile()
         
 class Function(Scope):
-    def __init__(self, parent=None):
+    def __init__(self, name, parent=None):
         Scope.__init__(self, parent)
+        self.name = name
+        if parent:
+            self.marker = parent.get_marker()
+
+    def insert_scope(self):
+        scope = Scope(self)
+        self.instrs.append(scope)
+        return scope
 
     def compile(self):
+        if self.parent:
+            self.assembler.insert_marker(self.marker)
         assert len(self.instrs) == 1 and isinstance(self.instrs[0], Scope)
         scope = self.instrs[0]
         marker = self.assembler.get_marker()
         if scope.has_references():
-            # print scope.references
             self.assembler.add_instr(["DUM", len(scope.references)])
             for i in scope.references:
                 self.assembler.add_instr(["LDC", 0])
@@ -263,6 +279,18 @@ def compile_if(self, args, stream):
     if len(args) == 3:
         compile_expr(args[2], code2)
 
+def compile_define(self, args, parent):
+    body = args[1:]
+    name = args[0][0].token
+    args = args[0][1:]
+    stream = parent.insert_function(name)
+    local_scope = stream.insert_scope()
+    for arg in args:
+        stream.add_var(arg.token)
+    for expr in body:
+        compile_expr(expr, local_scope)
+    return stream
+
 def compile_cond(self, args, stream):
     if len(args) < 2:
         raise sym_error('Cond must have at least 2 arguments, got %d' % len(args), self)
@@ -364,6 +392,7 @@ builtins = {
     'atom?': compile_uniop('ATOM'),
     'car': compile_uniop('CAR'),
     'cdr': compile_uniop('CDR'),
+    'define': compile_define,
     'cond': compile_cond,
     'do': compile_do,
     'set!': compile_set,
@@ -452,7 +481,7 @@ def compile_expr(expr, stream):
 def compile_function(definition, body):
     name = definition[0].token
     args = definition[1:]
-    stream = Function()
+    stream = Function(name)
     stream.assembler.insert_marker(name)
     local_scope = stream.insert_scope()
     for arg in args:
