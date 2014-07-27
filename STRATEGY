@@ -1,0 +1,25 @@
+Finding shortest path to the closest fruit!
+===========================================
+
+Init Stage (Should be done in that initial 1 minute)
+
+1. Find all junction points (includes forced corners)
+2. Find distance of all junction points to each other 
+3. Run the all pairs shortest path algorithm on the junction points and store
+    the paths
+4. Iterate through all the pills, power pills and fruits
+5. Find the closest junction point to each of the above item and store it
+
+Exec stage
+
+1. When lambdaman is at a junction point, and there are no more low hanging
+    fruits and pills, iterate through all the map elements stored in 5 in the 
+    init step. Find element whose junction point is closest to the 
+    lambdaman's current junction point
+2. Use the all pairs shortest paths stored in 3, to find the path towards that
+    closest junction point
+3. Go towards the junction point found above
+4. Distance to the fruit from this junction point will be a straight line
+    (since the forced bends are also considered junctions). Make the lambda man
+    move there, and eat the pill
+5. Go to step 1
