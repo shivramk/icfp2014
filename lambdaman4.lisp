@@ -1,7 +1,23 @@
-(define (at map ghostlocs x y)
+(define (fright x) (= (car x) 1))
+
+(define (sameloc? xy x y)
+  (if (= (car xy) x)
+    (if (= (cdr xy) y) 1 0) 0))
+
+
+(define (frightened? ghostfright ghostlocs x y) 
+  (if (atom? ghostlocs) 0
+    (if (sameloc? (car ghostlocs) x y)
+      (car ghostfright)
+      (frightened? (cdr ghostfright) (cdr ghostlocs) x y))))
+  
+
+(define (at map ghostlocs ghostfright x y)
   (set! row (getlistelem map y))
-  (if (contains? ghostlocs (cons x y) cmploc) 6
-      (getlistelem row x)))
+  (if (contains? ghostlocs (cons x y) cmploc)
+    (if (frightened? ghostfright ghostlocs x y) 7 6)
+    (getlistelem row x))
+  )
 
 (define (contains? list elem cmp)
   (if (atom? list) 0
@@ -53,32 +69,33 @@
         ((= v 3) 50)
         ((= v 4) 100)
         ((= v 5) 1)
+        ((= v 7) 1000)
         (else -1000)))
 
-(define (score width height map ghostlocs x y s depth)
+(define (score width height map ghostlocs ghostfright x y s depth)
   (cond ((or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) s)
         ((<= depth 0) s)
         ((< s -100000) s)
-        (else (best-score width height map ghostlocs x y s (- depth 1)
-                      (item-score (at map ghostlocs x y))))))
+        (else (best-score width height map ghostlocs ghostfright x y s (- depth 1)
+                      (item-score (at map ghostlocs ghostfright x y))))))
 
-(define (best-score width height map ghostlocs x y s depth v)
-  (set! left  (score width height map ghostlocs (- x 1) y (+ s v) depth))
-  (set! right (score width height map ghostlocs (+ x 1) y (+ s v) depth))
-  (set! up    (score width height map ghostlocs x (- y 1) (+ s v) depth))
-  (set! down  (score width height map ghostlocs x (+ y 1) (+ s v) depth))
+(define (best-score width height map ghostlocs ghostfright x y s depth v)
+  (set! left  (score width height map ghostlocs ghostfright (- x 1) y (+ s v) depth))
+  (set! right (score width height map ghostlocs ghostfright (+ x 1) y (+ s v) depth))
+  (set! up    (score width height map ghostlocs ghostfright x (- y 1) (+ s v) depth))
+  (set! down  (score width height map ghostlocs ghostfright x (+ y 1) (+ s v) depth))
   (set! minscore (min4 left right up down))
   (set! maxscore (max4 left right up down))
   (if (< 0 minscore) minscore maxscore))
 
-(define (findpill map ghostlocs x y dir step width height dist)
+(define (findpill map ghostlocs ghostfright x y dir step width height dist)
   (if (or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) (- 10000 dist)
-    (do (set! val (at map ghostlocs x y))
+    (do (set! val (at map ghostlocs ghostfright x y))
       (if (or (= val 2) (or (= val 3) (= val 4))) dist
         (if (= val 1)
           (if (= dir 0)
-            (findpill map ghostlocs (+ x step) y dir step width height (+ dist 1))
-            (findpill map ghostlocs x (+ y step) dir step width height (+ dist 1))) 
+            (findpill map ghostlocs ghostfright (+ x step) y dir step width height (+ dist 1))
+            (findpill map ghostlocs ghostfright x (+ y step) dir step width height (+ dist 1))) 
           (- 10000 dist))))))
 
 (define (penalty s d oppd)
@@ -96,23 +113,24 @@
 
 (define (cmploc a b) (and (= (car a) (car b)) (= (cdr a) (cdr b))))
 
-(define (dfs width height map ghostlocs x y vislist depth md)
+(define (dfs width height map ghostlocs ghostfright x y vislist depth md)
   (if (or (or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) (>= depth md)) 10000
-    (do (set! val (at map ghostlocs x y))
+    (do (set! val (at map ghostlocs ghostfright x y))
       (if (or (= val 0) (= val 6)) 10000
         (if (find1 vislist (cons x y) cmploc) 10000
           (if (or (= val 2) (= val 3)) depth
+            (if (= val 7) (- 0 depth)
             (do
             (set! nv (cons (cons x y) vislist))
             (set! nd (+ depth 1))
-            (set! scoreleft (dfs width height map ghostlocs (- x 1) y nv nd md))
+            (set! scoreleft (dfs width height map ghostlocs ghostfright (- x 1) y nv nd md))
             (set! md (min scoreleft md))
-            (set! scoreright (dfs width height map ghostlocs (+ x 1) y nv nd md))
+            (set! scoreright (dfs width height map ghostlocs ghostfright (+ x 1) y nv nd md))
             (set! md (min scoreright md))
-            (set! scoreup (dfs width height map ghostlocs x (- y 1) nv nd md))
+            (set! scoreup (dfs width height map ghostlocs ghostfright x (- y 1) nv nd md))
             (set! md (min scoreup md))
-            (set! scoredown (dfs width height map ghostlocs x (+ y 1) nv nd md))
-            (set! md (min scoredown md)) md)))))))
+            (set! scoredown (dfs width height map ghostlocs ghostfright x (+ y 1) nv nd md))
+            (set! md (min scoredown md)) md))))))))
 
 (define (make_move worldstate)
   (set! worldmap (gettupleelem worldstate 0))
@@ -125,6 +143,7 @@
   (set! dir (gettupleelem lambdastate 2))
   (set! ghoststate (gettupleelem worldstate 2))
   (set! ghostlocs (map ghoststate getloc))
+  (set! ghostfright (map ghoststate fright))
   (set! oppdir (mod (+ 2 dir) 4))
   (set! depth 4)
   ;(set! sleft  (penalty (score width height worldmap ghostlocs (- x 1) y 0 depth) 3 oppdir))
@@ -141,10 +160,10 @@
       ;(set! sright (findpill worldmap ghostlocs x y 0  1 width height 0))
       ;(set! sup    (findpill worldmap ghostlocs x y 1 -1 width height 0))
       ;(set! sdown  (findpill worldmap ghostlocs x y 1  1 width height 0))
-      (set! sleft  (dfs width height worldmap ghostlocs (- x 1) y 0 1 15))
-      (set! sright (dfs width height worldmap ghostlocs (+ x 1) y 0 1 15))
-      (set! sup    (dfs width height worldmap ghostlocs x (- y 1) 0 1 15))
-      (set! sdown  (dfs width height worldmap ghostlocs x (+ y 1) 0 1 15))
+      (set! sleft  (dfs width height worldmap ghostlocs ghostfright (- x 1) y 0 1 15))
+      (set! sright (dfs width height worldmap ghostlocs ghostfright (+ x 1) y 0 1 15))
+      (set! sup    (dfs width height worldmap ghostlocs ghostfright x (- y 1) 0 1 15))
+      (set! sdown  (dfs width height worldmap ghostlocs ghostfright x (+ y 1) 0 1 15))
       (debug -1)
       (debug (cons sup (cons sright (cons sdown (cons sleft 0)))))
       (minidx (cons sup (cons sright (cons sdown (cons sleft 0))))))
