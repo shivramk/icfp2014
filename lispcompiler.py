@@ -78,39 +78,30 @@ class Scope(object):
         self.funcs = {}
         self.blocks = []
 
-    def lookup_func(self, f):
-        if f in self.funcs:
-            return self.funcs[f]
-        elif self.parent is not None:
-            return self.parent.lookup_func(f)
-        return None
-
     def lookup(self, var):
-        if self.lookup_func(var):
-            return (0, 0) # Dummy
+        if var in self.funcs:
+            return (0, self.funcs[var], 'function')
         if var in self.references:
-            return (0, self.references[var])
+            return (0, self.references[var], 'var')
         elif self.parent is not None:
-            level, ref = self.parent.lookup(var)
+            level, ref, type = self.parent.lookup(var)
             if ref is None:
-                return None, None
-            return (level + 1, ref)
+                return None, None, None
+            return (level + 1, ref, type)
         else:
-            return None, None
+            return None, None, None
 
     def add_var(self, var):
         self.references[var] = len(self.references)
 
     def set_var(self, var, gen_instr=True):
-        level, ref = self.lookup(var)
+        level, ref, type = self.lookup(var)
         if ref is None:
             self.add_var(var)
-            level, ref = 0, len(self.references) - 1
-        # if level != 0:
-        #     raise semantic_error("Cant mutate variables from parent scope")
+            level, ref, type = 0, len(self.references) - 1, 'var'
         if gen_instr:
             self.add_instr("ST", level, ref)
-        return level, ref
+        return level, ref, type
 
     def get_marker(self, name=None):
         return self.assembler.get_marker(name)
@@ -119,14 +110,14 @@ class Scope(object):
         self.instrs.append(marker)
 
     def load_var(self, var):
-        funcaddr = self.lookup_func(var)
-        if funcaddr:
-            self.add_instr("LDF", funcaddr)
-            return
-        level, ref = self.lookup(var)
+        level, ref, type = self.lookup(var)
         if ref is None:
             raise semantic_error("Undefined reference to '%s'" % (var))
-        self.add_instr("LD", level, ref)
+        if type == 'function':
+            self.add_instr("LDF", ref)
+        else:
+            # print 'loading', var, level, ref
+            self.add_instr("LD", level, ref)
 
     def add_instr(self, op, *args):
         instr = [op] + list(args)
@@ -166,7 +157,7 @@ class Function(Scope):
         Scope.__init__(self, parent)
         self.name = name
         if parent:
-            self.marker = parent.get_marker()
+            self.marker = parent.get_marker(name)
 
     def insert_scope(self):
         scope = Scope(self)
@@ -201,10 +192,10 @@ class CodeBlock(Scope):
         return self.parent.lookup(var)
 
     def set_var(self, var, gen_instr=True):
-        level, ref = self.parent.set_var(var, False)
+        level, ref, type = self.parent.set_var(var, False)
         if gen_instr:
             self.add_instr("ST", level, ref)
-        return level, ref
+        return level, ref, type
 
     def compile(self):
         # print self.instrs
@@ -478,7 +469,7 @@ def compile_apply(self, args, stream):
     elif isinstance(self.token, int):
         compile_atom(self, stream)
     else:
-        level, ref = stream.lookup(self.token)
+        level, ref, type = stream.lookup(self.token)
         if ref is not None:
             for arg in args:
                 compile_expr(arg, stream)
@@ -489,7 +480,7 @@ def compile_apply(self, args, stream):
 
 def compile_var(self, stream):
     # Check if this is a local
-    level, ref = stream.lookup(self.token)
+    level, ref, type = stream.lookup(self.token)
     if ref is not None:
         stream.load_var(self.token)
     elif self.token in symtable:
