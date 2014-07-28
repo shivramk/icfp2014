@@ -8,6 +8,12 @@ int 5               ; Get the ghost's current position in
 mov [13], a          ; Save the ghost's coordinates in 13,14
 mov [14], b
 
+int 3
+int 6               ; Get the ghost's vitality and direction
+
+mov [15], a          ; Save the ghost's vitality in 15
+mov [16], b          ; Save the ghost's direction in 16
+
 ; TODO: if there is a deadend in the next 10 moves consider fickle
 
 ; Initial hack. For the first few moves do "fickle" to get out of home
@@ -51,12 +57,6 @@ int 1               ; Get lambdaman's coordinates
 
 mov [11], a          ; Save the lambdaman's coordinates in 11,12
 mov [12], b
-
-int 3
-int 6               ; Get the ghost's vitality and direction
-
-mov [15], a          ; Save the ghost's vitality in 15
-mov [16], b          ; Save the ghost's direction in 16
 
 mov a, [13]
 mov b, [14]
@@ -130,15 +130,27 @@ jeq $ifWallVert, c, c      ; non conditional jump to end
 ; $ifWallFickle
 int 7           ; get map content at location ahead
 jeq $fickle, a, 0
-jeq $end, c, c      ; non conditional jump to end
+jeq $move, c, c      ; non conditional jump to end
 
 ; $ifWallVert
 int 7           ; get map content at location ahead
 jeq $vert, a, 0
-jeq $end, c, c      ; non conditional jump to end
+jeq $move, c, c      ; non conditional jump to end
 
+
+; $move
+mov a, [15]
+jeq $oppEnd, a, 1    ; do opposite fright mode!
+jeq $end, c, c          ; non conditional jump to end
+
+; $oppEnd
+add c, 2
+jlt $end, c, 4
+
+sub c, 4
 
 ; $end
 mov a, c
+
 int 0
 hlt
