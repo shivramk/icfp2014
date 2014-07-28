@@ -68,7 +68,7 @@ sub b, [12]          ; Find out whether lambdaman is on up or down
 
 jgt 52, b, [14]  ; if diff is negative (diff greater than x in x-y)
 jeq 37, b, 0     ; if diff is 0
-jlt 40, b, [13]   ; if diff is positive
+jlt 40, b, [14]   ; if diff is positive
 
 ; vertical diff is equal
 ; check for horizontal difference
