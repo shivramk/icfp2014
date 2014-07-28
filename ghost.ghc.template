@@ -1,9 +1,23 @@
-inc [0]             ; ghc invocation counter
+inc [10]             ; ghc invocation counter
                     ; used to change approach depending on time spent
                     ; in the game for getting out of the home
 
+int 3               ; Get the ghost's index
+int 5               ; Get the ghost's current position in
+
+mov [13], a          ; Save the ghost's coordinates in 13,14
+mov [14], b
+
+; TODO: if there is a deadend in the next 10 moves consider fickle
+
 ; Initial hack. For the first few moves do "fickle" to get out of home
-jgt $aim, 0, 100
+jgt $aim, [10], 0
+
+; $changeDir
+; Just change direction if possible
+mov a, 0
+int 0
+hlt
 
 ; $fickle
 ; Keep track of how long we have spent travelling in each direction.
@@ -38,16 +52,14 @@ int 1               ; Get lambdaman's coordinates
 mov [11], a          ; Save the lambdaman's coordinates in 11,12
 mov [12], b
 
+int 3
 int 6               ; Get the ghost's vitality and direction
 
 mov [15], a          ; Save the ghost's vitality in 15
 mov [16], b          ; Save the ghost's direction in 16
 
-int 3               ; Get the ghost's index
-int 5               ; Get the ghost's current position in
-
-mov [13], a          ; Save the ghost's coordinates in 13,14
-mov [14], b
+mov a, [13]
+mov b, [14]
 
 sub a, [11]          ; Find out whether lambdaman is on left or right
 
@@ -58,7 +70,7 @@ jlt $left, a, [13]   ; if diff is positive
 ; horizontal diff is equal
 ; check for vertical difference
 ; $vert
-sub b, [12]          ; Find out whether lambdaman is on up or down
+sub b, [12]          ; Find out whether lambdaman is up or down
 
 jgt $down, b, [14]   ; if diff is negative (diff greater than x in x-y)
 
@@ -66,25 +78,65 @@ jlt $up, b, [14]     ; if diff is positive
 
 ; $up
 ; lambdaman is up
+jeq $fickle, [16], 2   ; ghost is going down, go fickle!
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+dec b           ; get pos above ghost in a,b
+
 mov c, 0
-jeq $end, c, c      ; non conditional jump to end
+jeq $ifWallFickle, c, c      ; non conditional jump to jmpIfWall
 
 ; $right
 ; lambdaman is on the right
-jeq $vert, [6], 3   ; ghost is going left, check for vertical
+jeq $vert, [16], 3   ; ghost is going left, check for vertical
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+inc a           ; get pos to the right of ghost in a,b
+
 mov c, 1
-jeq $end, c, c      ; non conditional jump to end
+
+jeq $ifWallVert, c, c      ; non conditional jump to jmpIfWall
 
 ; $down
 ; lambdaman is down
+jeq $fickle, [16], 0   ; ghost is going up, go fickle!
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+inc b           ; get pos below ghost in a,b
+
 mov c, 2
-jeq $end, c, c      ; non conditional jump to end
+
+jeq $ifWallFickle, c, c      ; non conditional jump to end
 
 ; $left
 ; lambdaman is on the left
-jeq $vert, [6], 1   ; ghost is going right, check for vertical
+jeq $vert, [16], 1   ; ghost is going right, check for vertical
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+dec a           ; get pos to the right of ghost in a,b
+
 mov c, 3
+
+jeq $ifWallVert, c, c      ; non conditional jump to end
+
+; $ifWallFickle
+int 7           ; get map content at location ahead
+jeq $fickle, a, 0
 jeq $end, c, c      ; non conditional jump to end
+
+; $ifWallVert
+int 7           ; get map content at location ahead
+jeq $vert, a, 0
+jeq $end, c, c      ; non conditional jump to end
+
 
 ; $end
 mov a, c

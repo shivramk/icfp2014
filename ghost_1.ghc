@@ -2,10 +2,24 @@ inc [10]             ; ghc invocation counter
 ; used to change approach depending on time spent
 ; in the game for getting out of the home
 
-; Initial hack. For the first few moves do "fickle" to get out of home
-jgt 16, [10], 10
+int 3               ; Get the ghost's index
+int 5               ; Get the ghost's current position in
 
-; 2
+mov [13], a          ; Save the ghost's coordinates in 13,14
+mov [14], b
+
+; TODO: if there is a deadend in the next 10 moves consider fickle
+
+; Initial hack. For the first few moves do "fickle" to get out of home
+jgt 23, [10], 0
+
+; 6
+; Just change direction if possible
+mov a, 0
+int 0
+hlt
+
+; 9
 ; Keep track of how long we have spent travelling in each direction.
 ; Try to go in the direction we've travelled in least.
 
@@ -15,14 +29,14 @@ mov b,0        ; B is the corresponding direction.
 mov c,255      ; C is the candidate direction for the new min.
 
 ; Start of loop.
-; 5
+; 12
 inc c          ; Pick new direction.
-jgt 9,[c],a    ; Jump if count of direction C is above best so far.
+jgt 16,[c],a    ; Jump if count of direction C is above best so far.
 ; We have a new min.
 mov a,[c]      ; Save new min.
 mov b,c        ; Save direction.
-; 9
-jlt 5,c,3      ; Jump target. Loop back if we have not tried all 4 directions.
+; 16
+jlt 12,c,3      ; Jump target. Loop back if we have not tried all 4 directions.
 
 mov a,b        ; Actually set desired direction.
 int 0
@@ -32,61 +46,99 @@ int 6          ; Get out current direction in B.
 inc [b]        ; Increment corresponding count.
 hlt            ; Stop.
 
-; 16
+; 23
 int 1               ; Get lambdaman's coordinates
 
 mov [11], a          ; Save the lambdaman's coordinates in 11,12
 mov [12], b
 
+int 3
 int 6               ; Get the ghost's vitality and direction
 
 mov [15], a          ; Save the ghost's vitality in 15
 mov [16], b          ; Save the ghost's direction in 16
 
-int 3               ; Get the ghost's index
-int 5               ; Get the ghost's current position in
-
-mov [13], a          ; Save the ghost's coordinates in 13,14
-mov [14], b
+mov a, [13]
+mov b, [14]
 
 sub a, [11]          ; Find out whether lambdaman is on left or right
 
-jgt 35, a, [13]  ; if diff is negative (diff greater than x in x-y)
-jeq 30, a, 0     ; if diff is 0
-jlt 40, a, [13]   ; if diff is positive
+jgt 45, a, [13]  ; if diff is negative (diff greater than x in x-y)
+jeq 36, a, 0     ; if diff is 0
+jlt 57, a, [13]   ; if diff is positive
 
 ; horizontal diff is equal
 ; check for vertical difference
-; 30
-sub b, [12]          ; Find out whether lambdaman is on up or down
+; 36
+sub b, [12]          ; Find out whether lambdaman is up or down
 
-jgt 38, b, [14]   ; if diff is negative (diff greater than x in x-y)
+jgt 51, b, [14]   ; if diff is negative (diff greater than x in x-y)
 
-jlt 33, b, [14]     ; if diff is positive
+jlt 39, b, [14]     ; if diff is positive
 
-; 33
+; 39
 ; lambdaman is up
+jeq 9, [16], 2   ; ghost is going down, go fickle!
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+dec b           ; get pos above ghost in a,b
+
 mov c, 0
-jeq 43, c, c      ; non conditional jump to end
+jeq 63, c, c      ; non conditional jump to jmpIfWall
 
-; 35
+; 45
 ; lambdaman is on the right
-jeq 30, [16], 3   ; ghost is going left, check for vertical
+jeq 36, [16], 3   ; ghost is going left, check for vertical
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+inc a           ; get pos to the right of ghost in a,b
+
 mov c, 1
-jeq 43, c, c      ; non conditional jump to end
 
-; 38
+jeq 66, c, c      ; non conditional jump to jmpIfWall
+
+; 51
 ; lambdaman is down
+jeq 9, [16], 0   ; ghost is going up, go fickle!
+
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+inc b           ; get pos below ghost in a,b
+
 mov c, 2
-jeq 43, c, c      ; non conditional jump to end
 
-; 40
+jeq 63, c, c      ; non conditional jump to end
+
+; 57
 ; lambdaman is on the left
-jeq 30, [16], 1   ; ghost is going right, check for vertical
-mov c, 3
-jeq 43, c, c      ; non conditional jump to end
+jeq 36, [16], 1   ; ghost is going right, check for vertical
 
-; 43
+mov a, [13]     ; get ghost pos
+mov b, [14]
+
+dec a           ; get pos to the right of ghost in a,b
+
+mov c, 3
+
+jeq 66, c, c      ; non conditional jump to end
+
+; 63
+int 7           ; get map content at location ahead
+jeq 9, a, 0
+jeq 69, c, c      ; non conditional jump to end
+
+; 66
+int 7           ; get map content at location ahead
+jeq 36, a, 0
+jeq 69, c, c      ; non conditional jump to end
+
+
+; 69
 mov a, c
 int 0
 hlt
