@@ -1,6 +1,8 @@
+; This AI performs vertical check first and then horizontal
+
 inc [10]             ; ghc invocation counter
-                    ; used to change approach depending on time spent
-                    ; in the game for getting out of the home
+; used to change approach depending on time spent
+; in the game for getting out of the home
 
 int 3               ; Get the ghost's index
 int 5               ; Get the ghost's current position in
@@ -16,43 +18,44 @@ mov [16], b          ; Save the ghost's direction in 16
 
 ; TODO: if there is a deadend in the next 10 moves consider fickle
 
-; Initial hack. For the first few moves do "fickle" to get out of home
-jgt $aim, [10], 0
+jeq 28, 0, 0
 
-; $changeDir
-; Just change direction if possible
+; 10
+; Just change direction if possible (not implemented)
 mov a, 0
 int 0
 hlt
 
-; $fickle
+; 13
 ; Keep track of how long we have spent travelling in each direction.
 ; Try to go in the direction we've travelled in least.
 
-               ; Count of time spent going in direction 0 is in memory address 0, and so on.
+; Count of time spent going in direction 0 is in memory address 0, and so on.
 mov a,255      ; A is the min value.
 mov b,0        ; B is the corresponding direction.
 mov c,255      ; C is the candidate direction for the new min.
 
 ; Start of loop.
-; $fickleLoop
+; 16
 inc c          ; Pick new direction.
-jgt $fickleContinue,[c],a    ; Jump if count of direction C is above best so far.
-               ; We have a new min.
+jgt 20,[c],a    ; Jump if count of direction C is above best so far.
+; We have a new min.
 mov a,[c]      ; Save new min.
 mov b,c        ; Save direction.
-; $fickleContinue
-jlt $fickleLoop,c,3      ; Jump target. Loop back if we have not tried all 4 directions.
+; 20
+jlt 16,c,3      ; Jump target. Loop back if we have not tried all 4 directions.
 
 mov a,b        ; Actually set desired direction.
 int 0
+
+inc [a]         ; Increment attempted moves as well
 
 int 3          ; Get our ghost index in A.
 int 6          ; Get out current direction in B.
 inc [b]        ; Increment corresponding count.
 hlt            ; Stop.
 
-; $aim
+; 28
 int 1               ; Get lambdaman's coordinates
 
 mov [11], a          ; Save the lambdaman's coordinates in 11,12
@@ -61,24 +64,24 @@ mov [12], b
 mov a, [13]
 mov b, [14]
 
-sub a, [11]          ; Find out whether lambdaman is on left or right
+sub b, [12]          ; Find out whether lambdaman is on up or down
 
-jgt $right, a, [13]  ; if diff is negative (diff greater than x in x-y)
-jeq $vert, a, 0     ; if diff is 0
-jlt $left, a, [13]   ; if diff is positive
+jgt 52, b, [14]  ; if diff is negative (diff greater than x in x-y)
+jeq 37, b, 0     ; if diff is 0
+jlt 40, b, [13]   ; if diff is positive
 
-; horizontal diff is equal
-; check for vertical difference
-; $vert
-sub b, [12]          ; Find out whether lambdaman is up or down
+; vertical diff is equal
+; check for horizontal difference
+; 37
+sub a, [11]          ; Find out whether lambdaman is up or down
 
-jgt $down, b, [14]   ; if diff is negative (diff greater than x in x-y)
+jgt 46, a, [13]   ; if diff is negative (diff greater than x in x-y)
 
-jlt $up, b, [14]     ; if diff is positive
+jlt 58, a, [13]     ; if diff is positive
 
-; $up
+; 40
 ; lambdaman is up
-jeq $fickle, [16], 2   ; ghost is going down, go fickle!
+jeq 37, [16], 2   ; ghost is going down, go fickle!
 
 mov a, [13]     ; get ghost pos
 mov b, [14]
@@ -86,11 +89,11 @@ mov b, [14]
 dec b           ; get pos above ghost in a,b
 
 mov c, 0
-jeq $ifWallFickle, c, c      ; non conditional jump to jmpIfWall
+jeq 67, c, c      ; non conditional jump to jmpIfWall
 
-; $right
+; 46
 ; lambdaman is on the right
-jeq $vert, [16], 3   ; ghost is going left, check for vertical
+jeq 13, [16], 3   ; ghost is going left, check for vertical
 
 mov a, [13]     ; get ghost pos
 mov b, [14]
@@ -99,11 +102,11 @@ inc a           ; get pos to the right of ghost in a,b
 
 mov c, 1
 
-jeq $ifWallVert, c, c      ; non conditional jump to jmpIfWall
+jeq 64, c, c      ; non conditional jump to jmpIfWall
 
-; $down
+; 52
 ; lambdaman is down
-jeq $fickle, [16], 0   ; ghost is going up, go fickle!
+jeq 37, [16], 0   ; ghost is going up, go fickle!
 
 mov a, [13]     ; get ghost pos
 mov b, [14]
@@ -112,11 +115,11 @@ inc b           ; get pos below ghost in a,b
 
 mov c, 2
 
-jeq $ifWallFickle, c, c      ; non conditional jump to end
+jeq 67, c, c      ; non conditional jump to end
 
-; $left
+; 58
 ; lambdaman is on the left
-jeq $vert, [16], 1   ; ghost is going right, check for vertical
+jeq 13, [16], 1   ; ghost is going right, check for vertical
 
 mov a, [13]     ; get ghost pos
 mov b, [14]
@@ -125,31 +128,31 @@ dec a           ; get pos to the right of ghost in a,b
 
 mov c, 3
 
-jeq $ifWallVert, c, c      ; non conditional jump to end
+jeq 64, c, c      ; non conditional jump to end
 
-; $ifWallFickle
+; 64
 int 7           ; get map content at location ahead
-jeq $fickle, a, 0
-jeq $move, c, c      ; non conditional jump to end
+jeq 13, a, 0
+jeq 70, c, c      ; non conditional jump to end
 
-; $ifWallVert
+; 67
 int 7           ; get map content at location ahead
-jeq $vert, a, 0
-jeq $move, c, c      ; non conditional jump to end
+jeq 37, a, 0
+jeq 70, c, c      ; non conditional jump to end
 
 
-; $move
+; 70
 mov a, [15]
-jeq $oppEnd, a, 1    ; do opposite fright mode!
-jeq $end, c, c          ; non conditional jump to end
+jeq 73, a, 1    ; do opposite fright mode!
+jeq 76, c, c          ; non conditional jump to end
 
-; $oppEnd
+; 73
 add c, 2
-jlt $end, c, 4
+jlt 76, c, 4
 
 sub c, 4
 
-; $end
+; 76
 mov a, c
 
 int 0
