@@ -35,14 +35,10 @@
       (minidx1 (cdr list) (+ curidx 1) curidx (car list))
       (minidx1 (cdr list) (+ curidx 1) minidx minval))))
 
-(define (find1 list elem idx)
+(define (find1 list elem cmp)
   (if (atom? list) 0
-    (if (= (car list) elem)
-      (cons idx (find1 (cdr list) elem (+ idx 1)))
-      (find1 (cdr list) elem (+ idx 1)))))
-
-(define (find list elem)
-  (find1 list elem 0))
+    (if (cmp (car list) elem) 1
+      (find1 (cdr list) elem cmp))))
 
 (define (maxidx l)
   (maxidx1 (cdr l) 1 0 (car l)))
@@ -73,7 +69,7 @@
   (set! down  (score width height map ghostlocs x (+ y 1) (+ s v) depth))
   (set! minscore (min4 left right up down))
   (set! maxscore (max4 left right up down))
-  (if 0 minscore maxscore))
+  (if (< 0 minscore) minscore maxscore))
 
 (define (findpill map ghostlocs x y dir step width height dist)
   (if (or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) (- 10000 dist)
@@ -98,6 +94,30 @@
 
 (define (getloc x) (getlistelem x 1))
 
+(define (cmploc a b) (and (= (car a) (car b)) (= (cdr a) (cdr b))))
+
+(define (dfs width height map ghostlocs x y vislist depth)
+  (if (find1 vislist (cons x y) cmploc) 10000
+    (if (or (or (< x 0) (>= x width)) (or (< y 0) (>= y height))) 10000
+      (do (set! val (at map ghostlocs x y))
+        (if (or (= val 2) (or (= val 3) (= val 4))) depth
+          (if (or (= val 1) (= val 5))
+            (do
+            (set! nv (cons (cons x y) vislist))
+            (set! nd (+ depth 1))
+            (set! score (dfs width height map ghostlocs (- x 1) y nv nd))
+            (if (< score 1000) score
+              (do 
+                (set! score (dfs width height map ghostlocs (+ x 1) y nv nd))
+                (if (< score 1000) score
+                  (do 
+                    (set! score (dfs width height map ghostlocs x (- y 1) nv nd))
+                    (if (< score 1000) score
+                      (do 
+                        (set! score (dfs width height map ghostlocs x (+ y 1) nv nd))
+                        (if (< score 1000) score
+                          score)))))))) 10000))))))
+
 (define (make_move worldstate)
   (set! worldmap (gettupleelem worldstate 0))
   (set! lambdastate (gettupleelem worldstate 1))
@@ -116,19 +136,28 @@
   (set! sup    (penalty (score width height worldmap ghostlocs x (- y 1) 0 depth) 0 oppdir))
   (set! sdown  (penalty (score width height worldmap ghostlocs x (+ y 1) 0 depth) 2 oppdir))
   (set! maxscore (max4 sleft sright sup sdown))
-  (debug maxscore)
+  (debug 9999)
+  (debug (cons sup (cons sright (cons sdown (cons sleft 0)))))
+  (debug (maxidx (cons sup (cons sright (cons sdown (cons sleft 0))))))
   (if (= maxscore depth)
     (do 
-      (set! sleft  (findpill worldmap ghostlocs x y 0 -1 width height 0))
-      (set! sright (findpill worldmap ghostlocs x y 0  1 width height 0))
-      (set! sup    (findpill worldmap ghostlocs x y 1 -1 width height 0))
-      (set! sdown  (findpill worldmap ghostlocs x y 1  1 width height 0))
-      (debug (cons sleft (cons sright (cons sup (cons sdown 0)))))
+      ;(set! sleft  (findpill worldmap ghostlocs x y 0 -1 width height 0))
+      ;(set! sright (findpill worldmap ghostlocs x y 0  1 width height 0))
+      ;(set! sup    (findpill worldmap ghostlocs x y 1 -1 width height 0))
+      ;(set! sdown  (findpill worldmap ghostlocs x y 1  1 width height 0))
+      (set! sleft  (dfs width height worldmap ghostlocs (- x 1) y 0 1))
+      (set! sright (dfs width height worldmap ghostlocs (+ x 1) y 0 1))
+      (set! sup    (dfs width height worldmap ghostlocs x (- y 1) 0 1))
+      (set! sdown  (dfs width height worldmap ghostlocs x (+ y 1) 0 1))
+      (debug -1)
+      (debug (cons sup (cons sright (cons sdown (cons sleft 0)))))
       (minidx (cons sup (cons sright (cons sdown (cons sleft 0))))))
     (maxidx (cons sup (cons sright (cons sdown (cons sleft 0)))))))
 
 (define (step aistate worldstate) 
-  (cons 0 (make_move worldstate)))
+  (set! move (make_move worldstate))
+  ;(debug move)
+  (cons 0 move))
 
 (define (main worldstate undocumented) 
   (cons 0 step))
